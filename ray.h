@@ -2,11 +2,11 @@
 #define RAY_TRACING_IOW_RAY_H
 #include <glm.hpp>
 
-class Ray
+class ray
 {
 public:
-    Ray() = default;
-    Ray(const glm::vec3& origin, const glm::vec3& direction) : origin(origin), direction(direction)
+    ray() = default;
+    ray(const glm::vec3& origin, const glm::vec3& direction) : origin(origin), direction(direction)
     {
     }
     glm::vec3 point_at_parameter(float t) const

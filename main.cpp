@@ -3,7 +3,8 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
 
-#include "Ray.h" // contains using namespace glm
+#include "sphere.h"
+#include "hitable_list.h"
 
 void saveImage(int width, int height, uint8_t* pixels, int channels, std::string name)
 {
@@ -44,37 +45,26 @@ void saveImage(int width, int height, uint8_t* pixels, int channels, std::string
     stbi_write_png(path_to_image.string().c_str(), width, height, channels, pixels, width * channels);
 }
 
-bool hit_sphere(const glm::vec3& center, float radius, const Ray& ray)
+glm::vec3 calculate_color(const ray& r, hitable* world)
 {
-    glm::vec3 oc = ray.origin - center;
-    float a = glm::dot(ray.direction, ray.direction);
-    float b = 2.0f * glm::dot(oc, ray.direction);
-    float c = glm::dot(oc, oc) - radius * radius;
-    float discriminant = b * b - 4 * a * c;
-    return discriminant > 0;
-}
-
-glm::vec3 calculate_color(const Ray& ray)
-{
-    if (hit_sphere(glm::vec3(0.0f, 0.0f, -1.0f), 0.5f, ray))
+    hit_record rec = {};
+    if (world->hit(r, 0.0f, std::numeric_limits<float>::max(), rec))
     {
-        return glm::vec3(1.0f, 0.0f, 1.0f);
+        return 0.5f * glm::vec3(rec.normal.x + 1, rec.normal.y + 1, rec.normal.z + 1);
     }
-    glm::vec3 unit_direction = glm::normalize(ray.direction);
-    float t = 0.5f * (unit_direction.y + 1.0f);
-    return (1.0f - t) * glm::vec3(1.0f, 1.0f, 1.0f) + t * glm::vec3(0.5f, 0.7f, 1.0f);
+    else
+    {
+        glm::vec3 unit_direction = glm::normalize(r.direction);
+        float t = 0.5f * (unit_direction.y + 1.0f);
+        return (1.0f - t) * glm::vec3(1.0f, 1.0f, 1.0f) + t * glm::vec3(0.5f, 0.7f, 1.0f);
+    }
 }
 
-int main()
+void trace(int nx, int ny, glm::vec3 origin, hitable* world, uint8_t* pixels)
 {
-    int nx = 1000;
-    int ny = 800;
-    int channels = 3;
-    glm::vec3 lower_left_corner(-1.0f, -1.0f, -1.0f);
-    glm::vec3 horizontal(2.0f, 0.0f, 0.0f);
+    glm::vec3 lower_left_corner(-(float(nx) / float(ny)), -1.0f, -1.0f);
+    glm::vec3 horizontal(2 * (float(nx) / float(ny)), 0.0f, 0.0f);
     glm::vec3 vertical(0.0f, 2.0f, 0.0f);
-    glm::vec3 origin(0.0f, 0.0f, 0.0f);
-    uint8_t* pixels = new uint8_t[nx * ny * channels]; // 3 because we don't use alpha
     int index = 0;
     for (int j = ny - 1; j >= 0; --j)
     {
@@ -82,8 +72,8 @@ int main()
         {
             float u = float(i) / float(nx);
             float v = float(j) / float(ny);
-            Ray ray(origin, lower_left_corner + u * horizontal + v * vertical);
-            glm::vec3 color = calculate_color(ray);
+            ray r(origin, lower_left_corner + u * horizontal + v * vertical);
+            glm::vec3 color = calculate_color(r, world);
             int ir = int(255.99 * color.r);
             int ig = int(255.99 * color.g);
             int ib = int(255.99 * color.b);
@@ -93,6 +83,20 @@ int main()
             pixels[index++] = ib;
         }
     }
+}
+
+int main()
+{
+    int nx = 1000;
+    int ny = 800;
+    int channels = 3;
+    hitable* list[2];
+    list[0] = new sphere(glm::vec3(0.0f, 0.0f, -1.0f), 0.5);
+    list[1] = new sphere(glm::vec3(0.0f, -100.5f, -1.0f), 100);
+    hitable* world = new hitable_list(list, 2);
+    glm::vec3 origin(0.0f, 0.0f, 0.0f);
+    uint8_t* pixels = new uint8_t[nx * ny * channels]; // 3 because we don't use alpha
+    trace(nx, ny, origin, world, pixels);
     // TODO built in my renderer to have the output show up in realtime in a window
     saveImage(nx, ny, pixels, channels, "");
     return 0;
