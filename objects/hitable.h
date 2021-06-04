@@ -3,13 +3,9 @@
 #define RAY_TRACING_IOW_HITABLE_H
 
 #include "ray.h"
+#include "hit_record.h"
 
-struct hit_record
-{
-    float t;
-    glm::vec3 p;
-    glm::vec3 normal;
-};
+class material;
 
 class hitable
 {

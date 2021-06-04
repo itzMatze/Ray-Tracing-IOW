@@ -1,12 +1,33 @@
 #include <iostream>
 #include <filesystem>
+#include <random>
+#include <thread>
+
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
 
-#include "sphere.h"
-#include "hitable_list.h"
+#include "materials/dielectric.h"
+#include "materials/metal.h"
+#include "materials/lambertian.h"
+#include "objects/sphere.h"
+#include "objects/hitable_list.h"
+#include "camera.h"
 
-void saveImage(int width, int height, uint8_t* pixels, int channels, std::string name)
+constexpr int nx = 1000;
+constexpr int ny = 800;
+constexpr int ns = 128;
+constexpr int channels = 3;
+constexpr int max_depth = 20;
+
+std::uniform_real_distribution<float> distribution;
+std::default_random_engine generator;
+
+inline float random_num()
+{
+    return distribution(generator);
+}
+
+void saveImage(uint8_t* pixels, const std::string &name)
 {
     std::string filename;
     if (!name.empty())
@@ -24,7 +45,7 @@ void saveImage(int width, int height, uint8_t* pixels, int channels, std::string
     filename.append(time);
 #endif
     filename.append(name);
-    filename.append( ".png");
+    filename.append(".png");
     // create target directory if needed
     std::filesystem::path images_path("../images/");
     if (!std::filesystem::exists(images_path))
@@ -41,16 +62,40 @@ void saveImage(int width, int height, uint8_t* pixels, int channels, std::string
         path_to_image.clear();
         path_to_image = std::filesystem::path(images_path.string().append(index_string.append(filename)));
         index++;
-    } while (std::filesystem::exists(path_to_image));
-    stbi_write_png(path_to_image.string().c_str(), width, height, channels, pixels, width * channels);
+    }
+    while (std::filesystem::exists(path_to_image));
+    stbi_write_png(path_to_image.string().c_str(), nx, ny, channels, pixels, nx * channels);
 }
 
-glm::vec3 calculate_color(const ray& r, hitable* world)
+glm::vec3 random_in_unit_sphere()
+{
+    glm::vec3 p;
+    do
+    {
+        p = 2.0f * glm::vec3(random_num(), random_num(), random_num()) -
+            glm::vec3(1.0f, 1.0f, 1.0f);
+    }
+    while (glm::length(p) >= 1.0f);
+    return p;
+}
+
+glm::vec3 calculate_color(const ray &r, hitable* world, int depth)
 {
     hit_record rec = {};
-    if (world->hit(r, 0.0f, std::numeric_limits<float>::max(), rec))
+    if (world->hit(r, 0.001f, std::numeric_limits<float>::max(), rec))
     {
-        return 0.5f * glm::vec3(rec.normal.x + 1, rec.normal.y + 1, rec.normal.z + 1);
+        ray scattered = {};
+        glm::vec3 attenuation;
+        if (depth < max_depth && rec.mat->scatter(r, rec, attenuation, scattered))
+        {
+            return attenuation * calculate_color(scattered, world, depth + 1);
+        }
+        else
+        {
+            return glm::vec3(0.0f, 0.0f, 0.0f);
+        }
+        // visualization of normals
+        //return 0.5f * glm::vec3(rec.normal.x + 1, rec.normal.y + 1, rec.normal.z + 1);
     }
     else
     {
@@ -60,44 +105,68 @@ glm::vec3 calculate_color(const ray& r, hitable* world)
     }
 }
 
-void trace(int nx, int ny, glm::vec3 origin, hitable* world, uint8_t* pixels)
+void calculate_pixel_row(camera* cam, hitable* world, uint8_t* pixels, int j)
 {
-    glm::vec3 lower_left_corner(-(float(nx) / float(ny)), -1.0f, -1.0f);
-    glm::vec3 horizontal(2 * (float(nx) / float(ny)), 0.0f, 0.0f);
-    glm::vec3 vertical(0.0f, 2.0f, 0.0f);
-    int index = 0;
+    int index = (ny - j - 1) * 3 * nx;
+    for (int i = 0; i < nx; ++i)
+    {
+        glm::vec3 color(0.0f, 0.0f, 0.0f);
+        for (int s = 0; s < ns; ++s)
+        {
+            float u = (float(i) + random_num()) / float(nx);
+            float v = (float(j) + random_num()) / float(ny);
+            ray r = cam->get_ray(u, v);
+            color += calculate_color(r, world, 0);
+        }
+        color /= float(ns);
+        color = glm::vec3(sqrt(color.r), sqrt(color.g), sqrt(color.b));
+        int ir = int(255.99 * color.r);
+        int ig = int(255.99 * color.g);
+        int ib = int(255.99 * color.b);
+        pixels[index++] = ir;
+        pixels[index++] = ig;
+        pixels[index++] = ib;
+        std::this_thread::yield();
+    }
+}
+
+void trace(camera* cam, hitable* world, uint8_t* pixels)
+{
+    std::thread threads[ny];
     for (int j = ny - 1; j >= 0; --j)
     {
-        for (int i = 0; i < nx; ++i)
-        {
-            float u = float(i) / float(nx);
-            float v = float(j) / float(ny);
-            ray r(origin, lower_left_corner + u * horizontal + v * vertical);
-            glm::vec3 color = calculate_color(r, world);
-            int ir = int(255.99 * color.r);
-            int ig = int(255.99 * color.g);
-            int ib = int(255.99 * color.b);
-
-            pixels[index++] = ir;
-            pixels[index++] = ig;
-            pixels[index++] = ib;
-        }
+        threads[j] = std::thread(calculate_pixel_row, cam, world, pixels, j);
+    }
+    for (int j = ny - 1; j >= 0; --j)
+    {
+        threads[j].join();
     }
 }
 
 int main()
 {
-    int nx = 1000;
-    int ny = 800;
-    int channels = 3;
-    hitable* list[2];
-    list[0] = new sphere(glm::vec3(0.0f, 0.0f, -1.0f), 0.5);
-    list[1] = new sphere(glm::vec3(0.0f, -100.5f, -1.0f), 100);
-    hitable* world = new hitable_list(list, 2);
-    glm::vec3 origin(0.0f, 0.0f, 0.0f);
+    {
+        // random number generator setup
+        std::random_device rd;
+        std::uniform_real_distribution<float> dis(0, 20000);
+        generator = std::default_random_engine(dis(rd));
+        distribution = std::uniform_real_distribution<float>(0, 1);
+    }
+    std::vector<hitable*> objects;
+    lambertian lambertian_orange(glm::vec3(0.8f, 0.3f, 0.8f));
+    lambertian lambertian_yellow(glm::vec3(0.1f, 0.8f, 0.8f));
+    metal silver(glm::vec3(0.8f, 0.8f, 0.8f), 0.2f);
+    metal gold(glm::vec3(0.8f, 0.6f, 0.2f), 0.1f);
+    dielectric glass(1.5f);
+    objects.push_back(new sphere(glm::vec3(0.0f, 0.0f, -2.0f), 0.5, lambertian_orange));
+    objects.push_back(new sphere(glm::vec3(0.0f, -100.5f, -2.0f), 100, lambertian_yellow));
+    objects.push_back(new sphere(glm::vec3(1.0f, 0.0f, -2.0f), 0.5f, glass));
+    objects.push_back(new sphere(glm::vec3(-1.0f, 0.0f, -2.0f), 0.5f, gold));
+    hitable* world = new hitable_list(objects);
+    camera cam(nx, ny);
     uint8_t* pixels = new uint8_t[nx * ny * channels]; // 3 because we don't use alpha
-    trace(nx, ny, origin, world, pixels);
-    // TODO built in my renderer to have the output show up in realtime in a window
-    saveImage(nx, ny, pixels, channels, "");
+    trace(&cam, world, pixels);
+    // TODO built in my renderer to have the output show up in realtime in a window, at this point also show initial output and trace more samples after that
+    saveImage(pixels, "");
     return 0;
 }

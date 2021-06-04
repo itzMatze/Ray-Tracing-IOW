@@ -1,6 +1,6 @@
 #include "sphere.h"
 
-bool sphere::hit(const ray &r, float t_min, float t_max, hit_record &rec) const
+bool sphere::hit(const ray &r, float t_min, float t_max, hit_record& rec) const
 {
     glm::vec3 oc = r.origin - center;
     float a = glm::dot(r.direction, r.direction);
@@ -15,6 +15,7 @@ bool sphere::hit(const ray &r, float t_min, float t_max, hit_record &rec) const
             rec.t = temp;
             rec.p = r.point_at_parameter(rec.t);
             rec.normal = (rec.p - center) / radius;
+            rec.mat = &mat;
             return true;
         }
         temp = (-b + sqrt(b * b - 4 * a * c)) / (2.0f * a);
@@ -23,6 +24,7 @@ bool sphere::hit(const ray &r, float t_min, float t_max, hit_record &rec) const
             rec.t = temp;
             rec.p = r.point_at_parameter(rec.t);
             rec.normal = (rec.p - center) / radius;
+            rec.mat = &mat;
             return true;
         }
     }
