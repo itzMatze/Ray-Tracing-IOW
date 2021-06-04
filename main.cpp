@@ -13,11 +13,19 @@
 #include "objects/hitable_list.h"
 #include "camera.h"
 
+// choose to render image fast or in great quality
+#if 1
 constexpr int nx = 1000;
 constexpr int ny = 800;
-constexpr int ns = 128;
-constexpr int channels = 3;
+constexpr int ns = 32;
+constexpr int max_depth = 15;
+#else
+constexpr int nx = 3840;
+constexpr int ny = 2160;
+constexpr int ns = 256;
 constexpr int max_depth = 20;
+#endif
+constexpr int channels = 3;
 
 std::uniform_real_distribution<float> distribution;
 std::default_random_engine generator;
@@ -117,6 +125,8 @@ void calculate_pixel_row(camera* cam, hitable* world, uint8_t* pixels, int j)
             float v = (float(j) + random_num()) / float(ny);
             ray r = cam->get_ray(u, v);
             color += calculate_color(r, world, 0);
+            // keep the system responsive
+            std::this_thread::yield();
         }
         color /= float(ns);
         color = glm::vec3(sqrt(color.r), sqrt(color.g), sqrt(color.b));
@@ -126,7 +136,6 @@ void calculate_pixel_row(camera* cam, hitable* world, uint8_t* pixels, int j)
         pixels[index++] = ir;
         pixels[index++] = ig;
         pixels[index++] = ib;
-        std::this_thread::yield();
     }
 }
 
@@ -153,17 +162,18 @@ int main()
         distribution = std::uniform_real_distribution<float>(0, 1);
     }
     std::vector<hitable*> objects;
-    lambertian lambertian_orange(glm::vec3(0.8f, 0.3f, 0.8f));
-    lambertian lambertian_yellow(glm::vec3(0.1f, 0.8f, 0.8f));
-    metal silver(glm::vec3(0.8f, 0.8f, 0.8f), 0.2f);
+    lambertian lambertian1(glm::vec3(0.5f, 0.1f, 0.7f));
+    lambertian lambertian2(glm::vec3(0.1f, 0.8f, 0.8f));
+    metal silver(glm::vec3(0.8f, 0.8f, 0.8f), 0.01f);
     metal gold(glm::vec3(0.8f, 0.6f, 0.2f), 0.1f);
     dielectric glass(1.5f);
-    objects.push_back(new sphere(glm::vec3(0.0f, 0.0f, -2.0f), 0.5, lambertian_orange));
-    objects.push_back(new sphere(glm::vec3(0.0f, -100.5f, -2.0f), 100, lambertian_yellow));
-    objects.push_back(new sphere(glm::vec3(1.0f, 0.0f, -2.0f), 0.5f, glass));
-    objects.push_back(new sphere(glm::vec3(-1.0f, 0.0f, -2.0f), 0.5f, gold));
+    objects.push_back(new sphere(glm::vec3(0.0f, 0.0f, -2.0f), 0.5, lambertian1));
+    objects.push_back(new sphere(glm::vec3(0.0f, -100.5f, -2.0f), 100, lambertian2));
+    objects.push_back(new sphere(glm::vec3(1.1f, 0.0f, -2.0f), 0.5f, glass));
+    objects.push_back(new sphere(glm::vec3(-1.1f, 0.0f, -2.0f), 0.5f, gold));
+    objects.push_back(new sphere(glm::vec3(0.3f, -0.3f, -1.1f), 0.2f, silver));
     hitable* world = new hitable_list(objects);
-    camera cam(nx, ny);
+    camera cam(glm::vec3(), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f), 90.0f, float(nx) / float(ny));
     uint8_t* pixels = new uint8_t[nx * ny * channels]; // 3 because we don't use alpha
     trace(&cam, world, pixels);
     // TODO built in my renderer to have the output show up in realtime in a window, at this point also show initial output and trace more samples after that
