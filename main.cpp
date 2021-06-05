@@ -17,8 +17,8 @@
 #if 1
 constexpr int nx = 1000;
 constexpr int ny = 800;
-constexpr int ns = 32;
-constexpr int max_depth = 15;
+constexpr int ns = 2;
+constexpr int max_depth = 10;
 #else
 constexpr int nx = 3840;
 constexpr int ny = 2160;
@@ -80,8 +80,7 @@ glm::vec3 random_in_unit_sphere()
     glm::vec3 p;
     do
     {
-        p = 2.0f * glm::vec3(random_num(), random_num(), random_num()) -
-            glm::vec3(1.0f, 1.0f, 1.0f);
+        p = 2.0f * glm::vec3(random_num(), random_num(), random_num()) - glm::vec3(1.0f, 1.0f, 1.0f);
     }
     while (glm::length(p) >= 1.0f);
     return p;
@@ -152,6 +151,51 @@ void trace(camera* cam, hitable* world, uint8_t* pixels)
     }
 }
 
+hitable* random_scene()
+{
+    auto* list = new std::vector<hitable*>;
+    lambertian* silver = new lambertian(glm::vec3(0.2f, 0.5f, 0.5f));
+    sphere* s = new sphere(glm::vec3(0.0f, -1000.0f, 0.0f), 1000.0f, *silver);
+    list->push_back(s);
+    for (int a = -11; a < 11; ++a)
+    {
+        for (int b = -11; b < 11; ++b)
+        {
+            float choose_mat = random_num();
+            glm::vec3 center(a + 0.6f * random_num(), 0.2f, b + 0.6f * random_num());
+            if (glm::length(center - glm::vec3(4.0f, 0.2f, 0.0f)) > 0.9f)
+            {
+                if (choose_mat < 0.7f)
+                {
+                    lambertian* color = new lambertian(glm::vec3(glm::max(random_num(), 0.2f), glm::max(random_num(), 0.2f), glm::max(random_num(), 0.2f)));
+                    s = new sphere(center, 0.2f, *color);
+                    list->push_back(s);
+                }
+                else if (choose_mat < 0.95f)
+                {
+                    metal* color = new metal(glm::vec3(glm::max(random_num(), 0.2f), glm::max(random_num(), 0.2f), glm::max(random_num(), 0.2f)), 0.3f * random_num());
+                    s = new sphere(center, 0.2f, *color);
+                    list->push_back(s);
+                }
+                else
+                {
+                    dielectric* color = new dielectric(1.5f);
+                    s = new sphere(center, 0.2f, *color);
+                    list->push_back(s);
+                }
+            }
+        }
+    }
+    lambertian* color = new lambertian(glm::vec3(0.1f, 0.8f, 0.9f));
+    metal* metal_color = new metal(glm::vec3(0.8f, 0.8f, 0.8f), 0.001f);
+    s = new sphere(glm::vec3(-1.0f, 2.0f, -2.6f), 1.0f, *metal_color);
+    list->push_back(s);
+    s = new sphere(glm::vec3(2.0f, 1.8f, -3.0f), 1.0f, *color);
+    list->push_back(s);
+    hitable* ran_scene = new hitable_list(list);
+    return ran_scene;
+}
+
 int main()
 {
     {
@@ -172,10 +216,12 @@ int main()
     objects.push_back(new sphere(glm::vec3(1.1f, 0.0f, -2.0f), 0.5f, glass));
     objects.push_back(new sphere(glm::vec3(-1.1f, 0.0f, -2.0f), 0.5f, gold));
     objects.push_back(new sphere(glm::vec3(0.3f, -0.3f, -1.1f), 0.2f, silver));
-    hitable* world = new hitable_list(objects);
-    camera cam(glm::vec3(), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f), 90.0f, float(nx) / float(ny));
+    hitable* world = new hitable_list(&objects);
+    camera cam(glm::vec3(0.0f, 1.5f, 0.0f), glm::vec3(0.0f, 0.0f, -15.0f), glm::vec3(0.0f, 1.0f, 0.0f),
+               90.0f, float(nx) / float(ny), 0.01f, 2.0f);
     uint8_t* pixels = new uint8_t[nx * ny * channels]; // 3 because we don't use alpha
-    trace(&cam, world, pixels);
+    hitable* ran_scene = random_scene();
+    trace(&cam, ran_scene, pixels);
     // TODO built in my renderer to have the output show up in realtime in a window, at this point also show initial output and trace more samples after that
     saveImage(pixels, "");
     return 0;
