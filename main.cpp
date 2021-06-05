@@ -2,6 +2,7 @@
 #include <filesystem>
 #include <random>
 #include <thread>
+#include <mutex>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
@@ -12,12 +13,14 @@
 #include "objects/sphere.h"
 #include "objects/hitable_list.h"
 #include "camera.h"
+#include "sdl_window/renderer.h"
 
+#define NUM_THREADS 14
 // choose to render image fast or in great quality
 #if 1
 constexpr int nx = 1000;
 constexpr int ny = 800;
-constexpr int ns = 2;
+constexpr int ns = 8;
 constexpr int max_depth = 10;
 #else
 constexpr int nx = 3840;
@@ -29,6 +32,8 @@ constexpr int channels = 3;
 
 std::uniform_real_distribution<float> distribution;
 std::default_random_engine generator;
+
+void shutdown();
 
 inline float random_num()
 {
@@ -112,42 +117,66 @@ glm::vec3 calculate_color(const ray &r, hitable* world, int depth)
     }
 }
 
-void calculate_pixel_row(camera* cam, hitable* world, uint8_t* pixels, int j)
+void calculate_pixel_row(camera* cam, hitable* world, std::atomic<int>* row, uint8_t* pixels, renderer* render_window)
 {
-    int index = (ny - j - 1) * 3 * nx;
-    for (int i = 0; i < nx; ++i)
+    for(int j = (*row)--; j >= 0; j = (*row)--)
     {
-        glm::vec3 color(0.0f, 0.0f, 0.0f);
-        for (int s = 0; s < ns; ++s)
+        int index = (ny - j - 1) * 3 * nx;
+        for (int i = 0; i < nx; ++i)
         {
-            float u = (float(i) + random_num()) / float(nx);
-            float v = (float(j) + random_num()) / float(ny);
-            ray r = cam->get_ray(u, v);
-            color += calculate_color(r, world, 0);
-            // keep the system responsive
-            std::this_thread::yield();
+            glm::vec3 color(0.0f, 0.0f, 0.0f);
+            for (int s = 0; s < ns; ++s)
+            {
+                float u = (float(i) + random_num()) / float(nx);
+                float v = (float(j) + random_num()) / float(ny);
+                ray r = cam->get_ray(u, v);
+                color += calculate_color(r, world, 0);
+                // keep the system responsive
+                std::this_thread::yield();
+            }
+            color /= float(ns);
+            color = glm::vec3(sqrt(color.r), sqrt(color.g), sqrt(color.b));
+            int ir = int(255.99 * color.r);
+            int ig = int(255.99 * color.g);
+            int ib = int(255.99 * color.b);
+            pixels[index++] = ir;
+            pixels[index++] = ig;
+            pixels[index++] = ib;
+            render_window->set_pixel(i, ny - j - 1, ir, ig, ib);
         }
-        color /= float(ns);
-        color = glm::vec3(sqrt(color.r), sqrt(color.g), sqrt(color.b));
-        int ir = int(255.99 * color.r);
-        int ig = int(255.99 * color.g);
-        int ib = int(255.99 * color.b);
-        pixels[index++] = ir;
-        pixels[index++] = ig;
-        pixels[index++] = ib;
+        if(j % 10 == 0)
+        {
+            render_window->render_frame();
+        }
     }
 }
 
-void trace(camera* cam, hitable* world, uint8_t* pixels)
+void trace(camera* cam, hitable* world, uint8_t* pixels, renderer* render_window)
 {
-    std::thread threads[ny];
-    for (int j = ny - 1; j >= 0; --j)
+    std::thread threads[NUM_THREADS];
+    std::atomic<int> row = ny - 1;
+    for (auto & t : threads)
     {
-        threads[j] = std::thread(calculate_pixel_row, cam, world, pixels, j);
+        t = std::thread(calculate_pixel_row, cam, world, &row, pixels, render_window);
     }
-    for (int j = ny - 1; j >= 0; --j)
+    bool quit = false;
+    while (!quit)
     {
-        threads[j].join();
+        SDL_Event e;
+        if (SDL_PollEvent(&e))
+        {
+            if (e.type == SDL_QUIT)
+            {
+                quit = true;
+            }
+        }
+        if (row < 0)
+        {
+            for (auto & t : threads)
+            {
+                t.join();
+            }
+        }
     }
 }
 
@@ -221,8 +250,8 @@ int main()
                90.0f, float(nx) / float(ny), 0.01f, 2.0f);
     uint8_t* pixels = new uint8_t[nx * ny * channels]; // 3 because we don't use alpha
     hitable* ran_scene = random_scene();
-    trace(&cam, ran_scene, pixels);
-    // TODO built in my renderer to have the output show up in realtime in a window, at this point also show initial output and trace more samples after that
+    renderer render_window(nx, ny);
+    trace(&cam, ran_scene, pixels, &render_window);
     saveImage(pixels, "");
     return 0;
 }
