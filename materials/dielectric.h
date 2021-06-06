@@ -10,7 +10,9 @@ class dielectric : public material
 public:
     explicit dielectric(float ri) : ref_idx(ri)
     {}
-    bool scatter(const ray& r_in, const hit_record& rec, glm::vec3& attenuation, ray& scattered) const override;
+
+    bool scatter(const ray& r_in, const hit_record& rec, glm::vec4& attenuation, ray& scattered) const override;
+
     float ref_idx;
 };
 

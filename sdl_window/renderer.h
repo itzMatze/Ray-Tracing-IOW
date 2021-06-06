@@ -11,27 +11,14 @@
 class renderer
 {
 public:
-    renderer(int width, int height);
+    renderer(int width, int render_width, int render_height);
     ~renderer();
     void clean_up_sdl() const;
     void render_frame();
     inline void set_pixel(int x, int y, color color);
-    inline void set_pixel(int x, int y, uint8_t r, uint8_t g, uint8_t b)
-    {
-        //assert(x < width && y < height);
-        //SDL_LockSurface(bitmapSurface);
-        unsigned int color = r;
-        color <<= 8;
-        color += g;
-        color <<= 8;
-        color += b;
-        color <<= 8;
-        color += 255;
-        ((unsigned int*) (bitmapSurface->pixels))[(x + width * y)] = color;
-        //SDL_UnlockSurface(bitmapSurface);
-    }
+    const void* get_pixels();
 
-    int width, height;
+    int render_width;
 private:
     SDL_Window* win = nullptr;
     SDL_Renderer* sdl_renderer = nullptr;

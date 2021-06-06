@@ -3,7 +3,7 @@ project(Ray_Tracing_IOW)
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_executable(Ray_Tracing_IOW main.cpp ray.cpp ray.h camera.h
+add_executable(Ray_Tracing_IOW main.cpp ray.h camera.h
         objects/hitable.h objects/sphere.cpp objects/sphere.h objects/hitable_list.cpp objects/hitable_list.h
         materials/material.h materials/lambertian.cpp materials/lambertian.h materials/metal.cpp materials/metal.h hit_record.h materials/dielectric.cpp materials/dielectric.h
         sdl_window/color.cpp sdl_window/color.h sdl_window/renderer.cpp sdl_window/renderer.h)

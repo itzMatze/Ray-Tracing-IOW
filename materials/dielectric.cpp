@@ -7,12 +7,12 @@ float schlick(float cosine, float ref_idx)
     return r0 + (1 - r0) * pow((1 - cosine), 5);
 }
 
-bool dielectric::scatter(const ray &r_in, const hit_record &rec, glm::vec3 &attenuation, ray &scattered) const
+bool dielectric::scatter(const ray& r_in, const hit_record& rec, glm::vec4& attenuation, ray& scattered) const
 {
     glm::vec3 outward_normal;
     glm::vec3 reflected = glm::reflect(r_in.direction, rec.normal);
     float ni_over_nt;
-    attenuation = glm::vec3(1.0f, 1.0f, 1.0f);
+    attenuation = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
     float cosine;
     if (glm::dot(r_in.direction, rec.normal) > 0)
     {

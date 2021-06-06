@@ -1,25 +1,26 @@
 #include "color.h"
 
-color::color() : r(0), g(0), b(0), a(0)
+color::color() : values(glm::vec4(0.0f))
 {
 }
 
-color::color(float r, float g, float b) : r(r), g(g), b(b), a(1)
+color::color(float r, float g, float b) : values(glm::vec4(r, g, b, 1.0f))
 {
 }
 
-color::color(float r, float g, float b, float a) : r(r), g(g), b(b), a(a)
+color::color(float r, float g, float b, float a) : values(glm::vec4(r, g, b, a))
 {
 }
 
 unsigned int color::get_hex_color() const
 {
-    unsigned int color = r > 1.0f ? 255 : static_cast<unsigned int>(r * 255);
+    unsigned int color = values.a > 1.0f ? 255 : static_cast<unsigned int>(values.a * 255);
     color <<= 8;
-    color += g > 1.0f ? 255 : static_cast<unsigned int>(g * 255);
+    color += values.b > 1.0f ? 255 : static_cast<unsigned int>(values.b * 255);
     color <<= 8;
-    color += b > 1.0f ? 255 : static_cast<unsigned int>(b * 255);
+    color += values.g > 1.0f ? 255 : static_cast<unsigned int>(values.g * 255);
     color <<= 8;
-    color += a > 1.0f ? 255 : static_cast<unsigned int>(a * 255);
+    color += values.r > 1.0f ? 255 : static_cast<unsigned int>(values.r * 255);
     return color;
 }
+
