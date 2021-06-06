@@ -20,7 +20,7 @@
 #if 1
 constexpr int nx = 1000;
 constexpr int ny = 800;
-constexpr int ns = 8;
+constexpr int ns = 4;
 constexpr int max_depth = 10;
 #else
 constexpr int nx = 3840;
@@ -40,7 +40,7 @@ inline float random_num()
     return distribution(generator);
 }
 
-void saveImage(uint8_t* pixels, const std::string &name)
+void saveImage(uint8_t* pixels, const std::string& name)
 {
     std::string filename;
     if (!name.empty())
@@ -91,7 +91,7 @@ glm::vec3 random_in_unit_sphere()
     return p;
 }
 
-glm::vec3 calculate_color(const ray &r, hitable* world, int depth)
+glm::vec3 calculate_color(const ray& r, hitable* world, int depth)
 {
     hit_record rec = {};
     if (world->hit(r, 0.001f, std::numeric_limits<float>::max(), rec))
@@ -119,7 +119,7 @@ glm::vec3 calculate_color(const ray &r, hitable* world, int depth)
 
 void calculate_pixel_row(camera* cam, hitable* world, std::atomic<int>* row, uint8_t* pixels, renderer* render_window)
 {
-    for(int j = (*row)--; j >= 0; j = (*row)--)
+    for (int j = (*row)--; j >= 0; j = (*row)--)
     {
         int index = (ny - j - 1) * 3 * nx;
         for (int i = 0; i < nx; ++i)
@@ -144,24 +144,22 @@ void calculate_pixel_row(camera* cam, hitable* world, std::atomic<int>* row, uin
             pixels[index++] = ib;
             render_window->set_pixel(i, ny - j - 1, ir, ig, ib);
         }
-        if(j % 10 == 0)
-        {
-            render_window->render_frame();
-        }
     }
 }
 
 void trace(camera* cam, hitable* world, uint8_t* pixels, renderer* render_window)
 {
     std::thread threads[NUM_THREADS];
+    bool threads_joined = false;
     std::atomic<int> row = ny - 1;
-    for (auto & t : threads)
+    for (auto& t : threads)
     {
         t = std::thread(calculate_pixel_row, cam, world, &row, pixels, render_window);
     }
     bool quit = false;
     while (!quit)
     {
+        render_window->render_frame();
         SDL_Event e;
         if (SDL_PollEvent(&e))
         {
@@ -170,9 +168,10 @@ void trace(camera* cam, hitable* world, uint8_t* pixels, renderer* render_window
                 quit = true;
             }
         }
-        if (row < 0)
+        if (!threads_joined && row < 0)
         {
-            for (auto & t : threads)
+            threads_joined = true;
+            for (auto& t : threads)
             {
                 t.join();
             }
@@ -196,13 +195,16 @@ hitable* random_scene()
             {
                 if (choose_mat < 0.7f)
                 {
-                    lambertian* color = new lambertian(glm::vec3(glm::max(random_num(), 0.2f), glm::max(random_num(), 0.2f), glm::max(random_num(), 0.2f)));
+                    lambertian* color = new lambertian(
+                            glm::vec3(glm::max(random_num(), 0.2f), glm::max(random_num(), 0.2f),
+                                      glm::max(random_num(), 0.2f)));
                     s = new sphere(center, 0.2f, *color);
                     list->push_back(s);
                 }
                 else if (choose_mat < 0.95f)
                 {
-                    metal* color = new metal(glm::vec3(glm::max(random_num(), 0.2f), glm::max(random_num(), 0.2f), glm::max(random_num(), 0.2f)), 0.3f * random_num());
+                    metal* color = new metal(glm::vec3(glm::max(random_num(), 0.2f), glm::max(random_num(), 0.2f),
+                                                       glm::max(random_num(), 0.2f)), 0.3f * random_num());
                     s = new sphere(center, 0.2f, *color);
                     list->push_back(s);
                 }
@@ -250,8 +252,8 @@ int main()
                90.0f, float(nx) / float(ny), 0.01f, 2.0f);
     uint8_t* pixels = new uint8_t[nx * ny * channels]; // 3 because we don't use alpha
     hitable* ran_scene = random_scene();
-    renderer render_window(nx, ny);
+    renderer render_window(nx, ny, nx, ny);
     trace(&cam, ran_scene, pixels, &render_window);
-    saveImage(pixels, "");
+    //saveImage(pixels, "");
     return 0;
 }
