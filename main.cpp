@@ -156,6 +156,7 @@ void trace(Camera* cam, Hitable* world, Renderer* render_window)
             if (e.type == SDL_QUIT)
             {
                 quit = true;
+                row = -NUM_THREADS - 1;
             }
         }
         // if the window gets closed before rendering has ended there will be an error because threads never got joined
