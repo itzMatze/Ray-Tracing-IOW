@@ -159,7 +159,6 @@ void trace(Camera* cam, Hitable* world, Renderer* render_window)
                 row = -NUM_THREADS - 1;
             }
         }
-        // if the window gets closed before rendering has ended there will be an error because threads never got joined
         if (!threads_joined && row < -NUM_THREADS)
         {
             threads_joined = true;
