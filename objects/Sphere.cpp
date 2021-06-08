@@ -1,6 +1,6 @@
-#include "sphere.h"
+#include "Sphere.h"
 
-bool sphere::hit(const ray &r, float t_min, float t_max, hit_record& rec) const
+bool Sphere::hit(const Ray &r, float t_min, float t_max, HitRecord& rec) const
 {
     glm::vec3 oc = r.origin - center;
     float a = glm::dot(r.direction, r.direction);

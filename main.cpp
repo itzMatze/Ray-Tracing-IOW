@@ -6,13 +6,13 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
 
-#include "materials/dielectric.h"
-#include "materials/metal.h"
-#include "materials/lambertian.h"
-#include "objects/sphere.h"
-#include "objects/hitable_list.h"
-#include "camera.h"
-#include "sdl_window/renderer.h"
+#include "materials/Dielectric.h"
+#include "materials/Metal.h"
+#include "materials/Lambertian.h"
+#include "objects/Sphere.h"
+#include "objects/HitableList.h"
+#include "Camera.h"
+#include "sdl_window/Renderer.h"
 
 #define NUM_THREADS 14
 // choose to render image fast or in great quality
@@ -37,7 +37,7 @@ inline float random_num()
     return distribution(generator);
 }
 
-void saveImage(uint32_t* pixels, const std::string& name)
+void save_image(uint32_t* pixels, const std::string& name)
 {
     std::string filename;
     if (!name.empty())
@@ -88,16 +88,16 @@ glm::vec3 random_in_unit_sphere()
     return p;
 }
 
-glm::vec4 calculate_color(const ray& r, hitable* world, int depth)
+glm::vec4 calculate_color(const Ray& r, Hitable* world, int depth)
 {
-    hit_record rec = {};
+    HitRecord rec = {};
     if (world->hit(r, 0.001f, std::numeric_limits<float>::max(), rec))
     {
-        ray scattered = {};
+        Ray scattered = {};
         glm::vec4 attenuation;
         if (depth < max_depth && rec.mat->scatter(r, rec, attenuation, scattered))
         {
-            return attenuation * calculate_color(scattered, world, depth + 1);
+            return attenuation * calculate_color(scattered, world, ++depth);
         }
         else
         {
@@ -114,18 +114,18 @@ glm::vec4 calculate_color(const ray& r, hitable* world, int depth)
     }
 }
 
-void calculate_pixel_row(camera* cam, hitable* world, std::atomic<int>* row, renderer* render_window)
+void calculate_pixel_row(Camera* cam, Hitable* world, std::atomic<int>* row, Renderer* render_window)
 {
     for (int j = (*row)--; j >= 0; j = (*row)--)
     {
         for (int i = 0; i < nx; ++i)
         {
-            color color(0.0f, 0.0f, 0.0f);
+            Color color(0.0f, 0.0f, 0.0f);
             for (int s = 0; s < ns; ++s)
             {
                 float u = (float(i) + random_num()) / float(nx);
                 float v = (float(j) + random_num()) / float(ny);
-                ray r = cam->get_ray(u, v);
+                Ray r = cam->get_ray(u, v);
                 color.values += calculate_color(r, world, 0);
                 // keep the system responsive
                 std::this_thread::yield();
@@ -137,7 +137,7 @@ void calculate_pixel_row(camera* cam, hitable* world, std::atomic<int>* row, ren
     }
 }
 
-void trace(camera* cam, hitable* world, renderer* render_window)
+void trace(Camera* cam, Hitable* world, Renderer* render_window)
 {
     std::thread threads[NUM_THREADS];
     bool threads_joined = false;
@@ -159,7 +159,7 @@ void trace(camera* cam, hitable* world, renderer* render_window)
             }
         }
         // if the window gets closed before rendering has ended there will be an error because threads never got joined
-        if (!threads_joined && row < 0)
+        if (!threads_joined && row < -NUM_THREADS)
         {
             threads_joined = true;
             for (auto& t : threads)
@@ -170,11 +170,11 @@ void trace(camera* cam, hitable* world, renderer* render_window)
     }
 }
 
-hitable* random_scene()
+Hitable* random_scene()
 {
-    auto* list = new std::vector<hitable*>;
-    lambertian* silver = new lambertian(glm::vec3(0.2f, 0.5f, 0.5f));
-    sphere* s = new sphere(glm::vec3(0.0f, -1000.0f, 0.0f), 1000.0f, *silver);
+    auto* list = new std::vector<Hitable*>;
+    Lambertian* silver = new Lambertian(glm::vec3(0.2f, 0.5f, 0.5f));
+    Sphere* s = new Sphere(glm::vec3(0.0f, -1000.0f, 0.0f), 1000.0f, *silver);
     list->push_back(s);
     for (int a = -11; a < 11; ++a)
     {
@@ -186,39 +186,38 @@ hitable* random_scene()
             {
                 if (choose_mat < 0.7f)
                 {
-                    lambertian* color = new lambertian(
+                    Lambertian* color = new Lambertian(
                             glm::vec3(glm::max(random_num(), 0.2f), glm::max(random_num(), 0.2f),
                                       glm::max(random_num(), 0.2f)));
-                    s = new sphere(center, 0.2f, *color);
+                    s = new Sphere(center, 0.2f, *color);
                     list->push_back(s);
                 }
                 else if (choose_mat < 0.95f)
                 {
-                    metal* color = new metal(glm::vec3(glm::max(random_num(), 0.2f), glm::max(random_num(), 0.2f),
+                    Metal* color = new Metal(glm::vec3(glm::max(random_num(), 0.2f), glm::max(random_num(), 0.2f),
                                                        glm::max(random_num(), 0.2f)), 0.3f * random_num());
-                    s = new sphere(center, 0.2f, *color);
+                    s = new Sphere(center, 0.2f, *color);
                     list->push_back(s);
                 }
                 else
                 {
-                    dielectric* color = new dielectric(1.5f);
-                    s = new sphere(center, 0.2f, *color);
+                    Dielectric* color = new Dielectric(1.5f);
+                    s = new Sphere(center, 0.2f, *color);
                     list->push_back(s);
                 }
             }
         }
     }
-    lambertian* color = new lambertian(glm::vec3(0.1f, 0.8f, 0.9f));
-    metal* metal_color = new metal(glm::vec3(0.8f, 0.8f, 0.8f), 0.001f);
-    s = new sphere(glm::vec3(-1.0f, 2.0f, -2.6f), 1.0f, *metal_color);
+    Lambertian* color = new Lambertian(glm::vec3(0.1f, 0.8f, 0.9f));
+    Metal* metal_color = new Metal(glm::vec3(0.8f, 0.8f, 0.8f), 0.001f);
+    s = new Sphere(glm::vec3(-1.0f, 2.0f, -2.6f), 1.0f, *metal_color);
     list->push_back(s);
-    s = new sphere(glm::vec3(2.0f, 1.8f, -3.0f), 1.0f, *color);
+    s = new Sphere(glm::vec3(2.0f, 1.8f, -3.0f), 1.0f, *color);
     list->push_back(s);
-    hitable* ran_scene = new hitable_list(list);
+    Hitable* ran_scene = new HitableList(list);
     return ran_scene;
 }
 
-// TODO make naming scheme consistent (forExample vs for_example)
 int main()
 {
     {
@@ -228,25 +227,25 @@ int main()
         generator = std::default_random_engine(dis(rd));
         distribution = std::uniform_real_distribution<float>(0, 1);
     }
-    std::vector<hitable*> objects;
-    lambertian lambertian1(glm::vec3(0.5f, 0.1f, 0.7f));
-    lambertian lambertian2(glm::vec3(0.1f, 0.8f, 0.8f));
-    metal silver(glm::vec3(0.8f, 0.8f, 0.8f), 0.01f);
-    metal gold(glm::vec3(0.8f, 0.6f, 0.2f), 0.1f);
-    dielectric glass(1.5f);
-    objects.push_back(new sphere(glm::vec3(0.0f, 0.0f, -2.0f), 0.5, lambertian1));
-    objects.push_back(new sphere(glm::vec3(0.0f, -100.5f, -2.0f), 100, lambertian2));
-    objects.push_back(new sphere(glm::vec3(1.1f, 0.0f, -2.0f), 0.5f, glass));
-    objects.push_back(new sphere(glm::vec3(-1.1f, 0.0f, -2.0f), 0.5f, gold));
-    objects.push_back(new sphere(glm::vec3(0.3f, -0.3f, -1.1f), 0.2f, silver));
-    hitable* world = new hitable_list(&objects);
-    camera cam(glm::vec3(0.0f, 1.5f, 0.0f), glm::vec3(0.0f, 0.0f, -15.0f), glm::vec3(0.0f, 1.0f, 0.0f),
+    std::vector<Hitable*> objects;
+    Lambertian lambertian_1(glm::vec3(0.5f, 0.1f, 0.7f));
+    Lambertian lambertian_2(glm::vec3(0.1f, 0.8f, 0.8f));
+    Metal silver(glm::vec3(0.8f, 0.8f, 0.8f), 0.01f);
+    Metal gold(glm::vec3(0.8f, 0.6f, 0.2f), 0.1f);
+    Dielectric glass(1.5f);
+    objects.push_back(new Sphere(glm::vec3(0.0f, 0.0f, -2.0f), 0.5, lambertian_1));
+    objects.push_back(new Sphere(glm::vec3(0.0f, -100.5f, -2.0f), 100, lambertian_2));
+    objects.push_back(new Sphere(glm::vec3(1.1f, 0.0f, -2.0f), 0.5f, glass));
+    objects.push_back(new Sphere(glm::vec3(-1.1f, 0.0f, -2.0f), 0.5f, gold));
+    objects.push_back(new Sphere(glm::vec3(0.3f, -0.3f, -1.1f), 0.2f, silver));
+    Hitable* world = new HitableList(&objects);
+    Camera cam(glm::vec3(0.0f, 1.5f, 0.0f), glm::vec3(0.0f, 0.0f, -15.0f), glm::vec3(0.0f, 1.0f, 0.0f),
                90.0f, float(nx) / float(ny), 0.01f, 2.0f);
-    hitable* ran_scene = random_scene();
-    renderer render_window(1000, nx, ny);
+    Hitable* ran_scene = random_scene();
+    Renderer render_window(1000, nx, ny);
     // TODO trace image incrementally, first one sample per pixel and then accumulate more
     // TODO probably also render first in lower resolution and then add resolution (this is probably not so easy)
     trace(&cam, ran_scene, &render_window);
-    saveImage((uint32_t*) render_window.get_pixels(), "");
+    save_image((uint32_t*) render_window.get_pixels(), "");
     return 0;
 }

@@ -1,9 +1,0 @@
-#include "lambertian.h"
-
-bool lambertian::scatter(const ray& r_in, const hit_record& rec, glm::vec4& attenuation, ray& scattered) const
-{
-    glm::vec3 target = rec.p + rec.normal + random_in_unit_sphere();
-    scattered = ray(rec.p, target - rec.p);
-    attenuation = glm::vec4(albedo, 1.0f);
-    return true;
-}

@@ -1,12 +1,12 @@
 #ifndef RAY_TRACING_IOW_CAMERA_H
 #define RAY_TRACING_IOW_CAMERA_H
 
-#include "ray.h"
+#include "Ray.h"
 
-class camera
+class Camera
 {
 public:
-    camera(glm::vec3 origin, glm::vec3 look_at, glm::vec3 up, float vfov, float aspect, float aperture, float focus_dist) : origin(origin)
+    Camera(glm::vec3 origin, glm::vec3 look_at, glm::vec3 up, float vfov, float aspect, float aperture, float focus_dist) : origin(origin)
     {
         lens_radius = aperture / 2.0f;
         float theta = vfov * std::_Pi / 180.0f;
@@ -19,12 +19,12 @@ public:
         horizontal = 2.0f * half_width * focus_dist * u;
         vertical = 2.0f * half_height * focus_dist * v;
     }
-    ray get_ray(float s, float t) const
+    Ray get_ray(float s, float t) const
     {
         glm::vec3 rd = lens_radius * random_in_unit_sphere();
         rd.z = 0.0f;
         glm::vec3 offset = u * rd.x + v * rd.y;
-        return ray(origin + offset, lower_left_corner + s * horizontal + t * vertical - origin - offset);
+        return Ray(origin + offset, lower_left_corner + s * horizontal + t * vertical - origin - offset);
     }
     glm::vec3 origin;
     glm::vec3 lower_left_corner;
