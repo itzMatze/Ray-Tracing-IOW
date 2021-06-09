@@ -13,6 +13,9 @@ public:
 
     bool scatter(const Ray& r_in, const HitRecord& rec, glm::vec4& attenuation, Ray& scattered) const override;
 
+private:
+    static float reflectance(float cosine, float ref_idx);
+
     float ref_idx;
 };
 

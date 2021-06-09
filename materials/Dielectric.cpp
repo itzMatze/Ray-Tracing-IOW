@@ -1,12 +1,5 @@
 #include "Dielectric.h"
 
-float schlick(float cosine, float ref_idx)
-{
-    float r0 = (1 - ref_idx) / (1 + ref_idx);
-    r0 = r0 * r0;
-    return r0 + (1 - r0) * pow((1 - cosine), 5);
-}
-
 bool Dielectric::scatter(const Ray& r_in, const HitRecord& rec, glm::vec4& attenuation, Ray& scattered) const
 {
     glm::vec3 outward_normal;
@@ -30,7 +23,7 @@ bool Dielectric::scatter(const Ray& r_in, const HitRecord& rec, glm::vec4& atten
     float reflect_prob;
     if (glm::length(refracted) > 0.0f)
     {
-        reflect_prob = schlick(cosine, ref_idx);
+        reflect_prob = reflectance(cosine, ref_idx);
     }
     else
     {
@@ -45,4 +38,12 @@ bool Dielectric::scatter(const Ray& r_in, const HitRecord& rec, glm::vec4& atten
         scattered = Ray(rec.p, refracted);
     }
     return true;
+}
+
+float Dielectric::reflectance(float cosine, float ref_idx)
+{
+    // use Schlick's approximation for reflectance
+    float r0 = (1 - ref_idx) / (1 + ref_idx);
+    r0 = r0 * r0;
+    return r0 + (1 - r0) * pow((1 - cosine), 5);
 }

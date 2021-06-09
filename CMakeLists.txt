@@ -22,3 +22,6 @@ target_include_directories(Ray_Tracing_IOW PUBLIC
 
 configure_file("C:/dev/VulkanSDK/1.2.176.1/Third-Party/Bin/SDL2.dll"
         "${PROJECT_SOURCE_DIR}/cmake-build-debug/" COPYONLY)
+
+configure_file("C:/dev/VulkanSDK/1.2.176.1/Third-Party/Bin/SDL2.dll"
+        "${PROJECT_SOURCE_DIR}/cmake-build-release/" COPYONLY)
